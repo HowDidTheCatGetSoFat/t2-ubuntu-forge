@@ -170,10 +170,17 @@ Loaded with `glmark2-drm` at forced-high DPM plus `stress-ng`:
 6. Under combined CPU+GPU load the cap matters *more*: without it PROCHOT
    returns (20–25 %) and delivered CPU work drops ~9 % below the capped case.
 
-**Caveats**: one machine, one model (`MacBookPro15,1`). Replications on other
-T2 models welcome — the sweep is one command:
-`sudo python3 bench/bench-throttling.py`. The 45 W value is specific to this
-chassis/chip, which is why the installer gates the cap on the DMI model.
+**Caveats**: one machine, one CPU (`MacBookPro15,1` with the i9-8950HK). The
+DMI gate also matches the i7-8750H/i7-8850H variants of the same chassis —
+all three options are 45 W TDP parts, so the cap equals design TDP for each,
+but it was **measured only on the i9**. The sweep was run with `thermald`
+stopped to isolate variables; the shipped configuration (cap + thermald
+running, ordered so thermald adopts the cap as its baseline) was spot-checked
+under load and across reboots, but has not had the full 39-run sweep.
+Single-thread/interactive loads draw ~32 W package on this chip — under the
+45 W cap — so bursty desktop use never engages it, and PL2 (125 W) is left
+untouched for sub-second transients. Replications on other T2 models
+welcome — the sweep is one command: `sudo python3 bench/bench-throttling.py`.
 
 ## Repo layout
 

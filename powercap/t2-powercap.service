@@ -8,7 +8,10 @@ After=suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate
 
 [Service]
 Type=oneshot
-RemainAfterExit=yes
+# NO RemainAfterExit: a oneshot left "active" is NOT re-run when
+# suspend.target wants it again on resume, so the cap would not be
+# reapplied after suspend (RAPL resets there). Dead-after-run means every
+# activation - boot and each resume - actually executes.
 ExecStart=/usr/local/sbin/t2-powercap.sh
 
 [Install]
