@@ -151,6 +151,16 @@ from the VRM, not the CPU sensor. The result oscillates between 3500 and
 
 With `int64`: +7.4 %. With `all` (mixed): +8.4 %.
 
+**Fan-curve check** (added after review): all runs above use the stock T2/SMC
+fan curve. To test whether a custom/aggressive fan curve changes the baseline
+pathology, the firmware-defaults case was re-run with both fans **pinned at
+max RPM before the load starts** (stronger than any curve response):
+5870/6073/6129 bogo-ops/s (~6024 ±134, ~+2 % vs auto, within noise) with
+PROCHOT still firing 16-38 % of the time. Even maximal airflow does not
+prevent the VRM-side PROCHOT sawtooth, and the initial excursion (Tjmax in
+under a second from a 53 °C start) is faster than any fan can spin up. Fan
+control changes the noise, not the pattern.
+
 ### Combined CPU+GPU load
 
 The dGPU (AMD Baffin, 40 W) is a separate package but **shares heatpipes and
