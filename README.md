@@ -76,6 +76,19 @@ boots you into a machine **with no internal keyboard or trackpad**. This
 installer writes both names; whichever exists gets loaded and
 `systemd-modules-load` still ends in success (verified).
 
+To be precise about what loading `t2bce_vhci` does — it does *not* load the
+VHCI "alone": modprobe resolves `t2bce_core` + `t2bce_dma` through module
+dependencies, and `t2bce_audio` binds by its own PCI alias (`106b:1803`), so
+the whole MFD stack comes up (verified in the boot journal: dma → core → vhci
+in dependency order, audio bound). Explicit load is the stack's canonical
+path — `t2bce_vhci` ships no modalias — and matches the t2linux wiki's own
+instruction. One observation worth noting: `t2bce_core` *does* carry a PCI
+alias (`106b:1801`) yet udev coldplug did not autoload it on this machine, so
+without the explicit entry the boot comes up with no input devices. If both
+driver generations ever coexist for one kernel, `t2bce` is listed first, and
+upstream ([deqrocks/t2bce](https://github.com/deqrocks/t2bce)) recommends
+blacklisting `apple-bce` outright.
+
 ### Gotcha 2: macOS and Linux report different serials for USB disks
 
 For a disk in a USB enclosure, macOS shows the enclosure's serial while udev's

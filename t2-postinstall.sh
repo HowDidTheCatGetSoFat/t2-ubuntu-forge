@@ -141,8 +141,15 @@ if grep -qs '^t2bce_vhci$' /etc/modules-load.d/t2.conf \
 else
 	if cat > /etc/modules-load.d/t2.conf <<'EOF'
 # T2 VHCI: exposes the internal keyboard, trackpad and Touch Bar.
-# It does NOT autoload; it must be requested explicitly.
-# The module name depends on the kernel; both are listed, whichever exists loads.
+# It does NOT autoload (no modalias), so explicit load is the canonical path,
+# matching the t2linux wiki. Listing t2bce_vhci brings up the whole MFD stack:
+# modprobe resolves t2bce_core+t2bce_dma via depends, and t2bce_audio binds on
+# its own PCI alias (106b:1803). apple_bce is the fallback for the stock
+# Ubuntu kernel, where the BCE driver is the old DKMS module and t2bce_* does
+# not exist. Only one of the two exists per kernel; the missing one is logged
+# by systemd-modules-load and ignored. If both ever coexist for one kernel,
+# t2bce is listed first and upstream (deqrocks/t2bce) recommends blacklisting
+# apple-bce.
 t2bce_vhci
 apple_bce
 EOF
