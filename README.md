@@ -20,7 +20,7 @@ Touch Bar all work.
 |---|---|
 | Wi-Fi/Bluetooth firmware | **captured automatically from the macOS install on the internal disk** during installation (`get-apple-firmware get_from_macos`, using the apfs driver the t2linux ISO already ships. No prior macOS-side step needed.) |
 | Kernel parameters | `intel_iommu=on iommu=pt pm_async=off` |
-| T2 VHCI modules at boot | writes **both** `t2bce_vhci` and `apple_bce` to `modules-load.d` — see [the kernel gotcha](#gotcha-1-the-vhci-module-name-depends-on-the-kernel) |
+| T2 VHCI at boot | oneshot unit: `modprobe t2bce_vhci \|\| modprobe apple_bce` — tries the new MFD stack, falls back to the legacy driver, **never loads both**; `apple-bce` modalias autoload is blacklisted per upstream's recommendation — see [the kernel gotcha](#gotcha-1-the-vhci-module-name-depends-on-the-kernel) |
 | Touch Bar (Esc / F-keys) | `tiny-dfr` `.deb` bundled in the ISO, installed offline |
 | SSH | `openssh-server` installed offline from the ISO pool |
 | i9 anti-throttling | PL1 power cap service, installed **only** when the target is a `MacBookPro15,1` (see [measurements](#the-i9-throttling-study)) |
@@ -71,23 +71,27 @@ VHCI module **does not autoload** — and its *name changes between kernels*
 | stock Ubuntu + DKMS (`7.0.0-x-generic`, what the ISO installs) | `apple_bce` | `t2bce_*` does not exist |
 | t2linux patched (`7.1.5-1-t2-*`, what `apt full-upgrade` brings in) | `t2bce_vhci` (in-tree) | `apple_bce` does not exist |
 
-If `/etc/modules-load.d/` names only one of them, a kernel upgrade silently
-boots you into a machine **with no internal keyboard or trackpad**. This
-installer writes both names; whichever exists gets loaded and
-`systemd-modules-load` still ends in success (verified).
+If your config names only one of them, a kernel upgrade silently boots you
+into a machine **with no internal keyboard or trackpad**. And naming *both* in
+`modules-load.d` has the opposite hazard: should the two generations ever
+coexist for one kernel (e.g. DKMS leftovers of apple-bce built against the t2
+kernel), both would get loaded and race for the same PCI device.
 
-To be precise about what loading `t2bce_vhci` does — it does *not* load the
-VHCI "alone": modprobe resolves `t2bce_core` + `t2bce_dma` through module
-dependencies, and `t2bce_audio` binds by its own PCI alias (`106b:1803`), so
-the whole MFD stack comes up (verified in the boot journal: dma → core → vhci
-in dependency order, audio bound). Explicit load is the stack's canonical
-path — `t2bce_vhci` ships no modalias — and matches the t2linux wiki's own
-instruction. One observation worth noting: `t2bce_core` *does* carry a PCI
-alias (`106b:1801`) yet udev coldplug did not autoload it on this machine, so
-without the explicit entry the boot comes up with no input devices. If both
-driver generations ever coexist for one kernel, `t2bce` is listed first, and
-upstream ([deqrocks/t2bce](https://github.com/deqrocks/t2bce)) recommends
-blacklisting `apple-bce` outright.
+So the installer does neither. It ships a oneshot unit that runs
+`modprobe t2bce_vhci || modprobe apple_bce` — new stack first, legacy driver
+as fallback, **never both** — plus a `blacklist apple_bce` entry, which blocks
+modalias autoload only (the unit's explicit modprobe still works on kernels
+without t2bce). That blacklist is exactly what upstream
+([deqrocks/t2bce](https://github.com/deqrocks/t2bce)) recommends.
+
+For the record, loading `t2bce_vhci` does *not* bring it up "alone": modprobe
+resolves `t2bce_core` + `t2bce_dma` through module dependencies, and
+`t2bce_audio` binds by its own PCI alias (`106b:1803`), so the whole MFD stack
+comes up (verified in the boot journal: dma → core → vhci in dependency
+order, audio bound). An explicit load is required in the first place because
+`t2bce_vhci` ships no modalias — and, curiously, `t2bce_core` *does* carry a
+PCI alias (`106b:1801`) yet udev coldplug did not autoload it on this
+machine; without an explicit entry the boot comes up with no input devices.
 
 ### Gotcha 2: macOS and Linux report different serials for USB disks
 

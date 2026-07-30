@@ -1,6 +1,10 @@
 [Unit]
 Description=Cap sustained CPU power (T2 i9 anti-throttling)
-After=multi-user.target suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target
+# Must run BEFORE thermald: thermald captures the PL1 value present at its
+# startup as the baseline it later restores. If it starts first it adopts
+# the firmware's 100 W and keeps reverting the cap (seen on first reboot).
+Before=thermald.service
+After=suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target
 
 [Service]
 Type=oneshot

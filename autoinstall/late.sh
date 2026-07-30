@@ -112,39 +112,45 @@ else
 fi
 
 # ---------- 3. T2 modules ----------
-mkdir -p "$T/etc/modules-load.d"
-# The VHCI module name DEPENDS ON THE KERNEL. Verified with modinfo on the
-# real machine, on both kernels:
-#
-#   stock Ubuntu kernel + DKMS (7.0.0-x-generic) -> apple_bce
-#                                                   t2bce_* does NOT exist
-#   t2linux patched kernel (7.1.5-1-t2-*)        -> t2bce_vhci (in-tree)
-#                                                   apple_bce does NOT exist
-#
-# The ISO installs the stock kernel, but an `apt full-upgrade` pulls in the
-# t2linux kernel and boots it. If the name does not match, the VHCI never
-# loads and you end up with NO internal keyboard or trackpad.
-#
-# Both names are listed: whichever exists gets loaded. systemd logs the
-# missing one and the unit still ends in success (verified).
-if cat > "$T/etc/modules-load.d/t2.conf" <<'EOF'
-# T2 VHCI: exposes the internal keyboard, trackpad and Touch Bar.
-# It does NOT autoload (no modalias), so explicit load is the canonical path,
-# matching the t2linux wiki. Listing t2bce_vhci brings up the whole MFD stack:
-# modprobe resolves t2bce_core+t2bce_dma via depends, and t2bce_audio binds on
-# its own PCI alias (106b:1803). apple_bce is the fallback for the stock
-# Ubuntu kernel, where the BCE driver is the old DKMS module and t2bce_* does
-# not exist. Only one of the two exists per kernel; the missing one is logged
-# by systemd-modules-load and ignored. If both ever coexist for one kernel,
-# t2bce is listed first and upstream (deqrocks/t2bce) recommends blacklisting
-# apple-bce.
-t2bce_vhci
-apple_bce
-EOF
-then
-	good "T2 VHCI in /etc/modules-load.d/t2.conf (t2bce_vhci + apple_bce)"
+# The BCE driver differs per kernel: the stock Ubuntu kernel ships the legacy
+# apple-bce DKMS module, the t2linux kernel ships the t2bce MFD stack
+# (deqrocks/t2bce). Only one must ever be active. A modules-load.d file
+# listing both would load both if they ever coexisted for one kernel (e.g.
+# DKMS leftovers), so instead:
+#   - blacklist apple-bce: blocks udev modalias autoload only; the explicit
+#     modprobe in the unit below still loads it on kernels where t2bce is
+#     absent. Upstream t2bce recommends exactly this blacklist.
+#   - a oneshot unit tries the new stack first and falls back to the legacy
+#     driver - never both. t2bce_vhci ships no modalias, so an explicit load
+#     is required anyway; modprobe pulls t2bce_core+t2bce_dma via depends and
+#     t2bce_audio binds by its own PCI alias.
+mkdir -p "$T/etc/modprobe.d" "$T/etc/systemd/system"
+cat > "$T/etc/modprobe.d/t2bce-prefer.conf" <<'CONF'
+# Prefer the t2bce MFD stack over the legacy apple-bce driver.
+# "blacklist" only blocks modalias autoload; the explicit modprobe in
+# t2-vhci.service still loads apple_bce on kernels without t2bce.
+blacklist apple_bce
+CONF
+cat > "$T/etc/systemd/system/t2-vhci.service" <<'UNIT'
+[Unit]
+Description=Load T2 BCE VHCI (internal keyboard/trackpad/Touch Bar)
+DefaultDependencies=no
+After=systemd-modules-load.service
+Before=sysinit.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'modprobe t2bce_vhci || modprobe apple_bce'
+
+[Install]
+WantedBy=sysinit.target
+UNIT
+rm -f "$T/etc/modules-load.d/t2.conf"
+if in_target systemctl enable t2-vhci.service >/dev/null 2>&1; then
+	good "T2 VHCI loader installed (t2bce first, apple_bce fallback, never both)"
 else
-	fail "could not write modules-load.d/t2.conf"
+	fail "could not enable t2-vhci.service"
 fi
 
 # ---------- 4. tiny-dfr (Touch Bar) ----------
