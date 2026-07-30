@@ -3,6 +3,9 @@
 PL1_WATTS=45
 
 # PL1 averaging window in microseconds.
-# The firmware default is ~28 s, which is far too long: it lets the CPU pull
-# 100 W for several seconds and hit 100 C before the limit bites. 1 s avoids that.
+# The firmware default is ~28 s. Measured on this machine, the initial
+# all-core burst is ~89 W for about half a second and the package hits Tjmax
+# (100 C) in under a second, so a 28 s window never constrains anything: the
+# die is thermal-throttling long before the window fills. A 1 s window makes
+# PL1 engage before the thermal excursion.
 PL1_WINDOW_US=1000000

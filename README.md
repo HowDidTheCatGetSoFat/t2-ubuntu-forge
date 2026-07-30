@@ -117,10 +117,24 @@ in [`bench/`](bench/).
 
 ### Without mitigation, the failure mode is sawtooth PROCHOT
 
-At firmware defaults the package hits 100 °C within seconds, then **BD
-PROCHOT pins all cores at 799 MHz while the die cools down to ~73 °C** — the
-assertion comes from the VRM, not the CPU sensor. The result oscillates
-between 3500 and 800 MHz.
+Measured transient at firmware defaults (0.5 s RAPL energy sampling, cold
+start at 53 °C, 12-thread `matrixprod`):
+
+```
+0.5 s   88.8 W   100 C    <- ~89 W burst, Tjmax in under a second
+1-9 s   80->57 W 100 C    <- ~9 s pinned at Tjmax, thermal-throttling
+9.5 s+  11<->73 W 65<->100 <- the BD PROCHOT sawtooth begins
+```
+
+Note what this means: the initial burst is ~89 W (not 100), and the package
+goes from 53 °C to Tjmax in **under a second** — so PL1's ~28 s firmware
+window never gets a say in any of it; the thermal limit acts first. (An
+earlier revision of this text claimed the window "lets the CPU pull 100 W for
+several seconds"; review feedback correctly called that unsupported, and the
+measurement above replaces it.) After ~9 s of riding Tjmax, **BD PROCHOT pins
+all cores at 799 MHz while the die cools to ~73 °C** — the assertion comes
+from the VRM, not the CPU sensor. The result oscillates between 3500 and
+800 MHz.
 
 ### Config sweep (stress-ng `matrixprod`, heavy FP/vector)
 
