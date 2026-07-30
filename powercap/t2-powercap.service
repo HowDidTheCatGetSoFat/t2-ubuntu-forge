@@ -1,0 +1,11 @@
+[Unit]
+Description=Cap sustained CPU power (T2 i9 anti-throttling)
+After=multi-user.target suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/t2-powercap.sh
+
+[Install]
+WantedBy=multi-user.target suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target

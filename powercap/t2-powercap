@@ -1,0 +1,8 @@
+# Sustained CPU power limit (i9-8950HK) in watts.
+# 45 = design TDP. Lower to 40/35 for a cooler, quieter machine.
+PL1_WATTS=45
+
+# PL1 averaging window in microseconds.
+# The firmware default is ~28 s, which is far too long: it lets the CPU pull
+# 100 W for several seconds and hit 100 C before the limit bites. 1 s avoids that.
+PL1_WINDOW_US=1000000

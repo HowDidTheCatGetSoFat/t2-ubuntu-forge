@@ -1,0 +1,6 @@
+# ISOs and firmware are never committed.
+# Apple firmware is proprietary: extracted from your own Mac, not distributable.
+*.iso
+firmware.tar
+*.deb
+.DS_Store
